@@ -1,0 +1,57 @@
+# 定时拉取 PRTS 维基数据并生成 ICS 日历，提交回仓库并上传至 Release
+name: Update calendar
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate ICS files
+        run: python prts_calendar.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/
+          git diff --staged --quiet || (git commit -m "chore: update calendar ICS [skip ci]" && git push)
+
+      - name: Delete old release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view latest &>/dev/null; then
+            for name in $(gh release view latest --json assets -q '.assets[].name'); do
+              gh release delete-asset latest "$name" --yes
+            done
+          fi
+
+      - name: Upload ICS to Release (tag latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Calendar ICS (latest)
+          body: "自动生成的 PRTS 卡池与活动日历（ICS），可订阅或导入日历应用。"
+          files: output/*.ics
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
