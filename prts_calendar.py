@@ -470,6 +470,11 @@ if __name__ == "__main__":
                     print(f"  → {skip_msg}，跳过。")
                     continue
 
+            # 保证每条事件都有寻访/活动 wiki 链接（无则用数据源页面）
+            default_wiki = "https://prts.wiki/w/" + quote(page_title, safe="/")
+            for ev in events:
+                ev.setdefault("wiki_url", default_wiki)
+
             if build_yearly or build_current:
                 counts = generate_ics_by_year(
                     events=events,
