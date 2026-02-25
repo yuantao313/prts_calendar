@@ -4,31 +4,38 @@
 
 ## 订阅链接（Release）
 
-若本仓库已通过 GitHub Actions 发布到 Release（tag: `latest`），可直接用下列**订阅链接**添加到日历应用（如 iOS 日历、Google 日历、Outlook 等），应用会定期拉取更新。
+Actions 会生成两个 Release：
 
-将 `OWNER`、`REPO` 替换为你 fork 后的 GitHub 用户名与仓库名，或本仓库的实际地址：
+- **当年 + 全量**（tag: `latest`）：`*_latest.ics`（当年订阅用）、`*_all.ics`（全量），适合日常订阅。
+- **每年归档**（tag: `archive`）：`prts_*_2019.ics` … `prts_*_2026.ics`，按年下载。
 
-| 日历 | 订阅链接（仅当年，推荐） |
-|------|--------------------------|
-| 限时寻访 | `https://github.com/OWNER/REPO/releases/download/latest/prts_limited_recruit_latest.ics` |
-| 常驻标准寻访 | `https://github.com/OWNER/REPO/releases/download/latest/prts_standard_latest.ics` |
-| 常驻中坚寻访与甄选 | `https://github.com/OWNER/REPO/releases/download/latest/prts_mid_recruit_latest.ics` |
-| 活动一览 | `https://github.com/OWNER/REPO/releases/download/latest/prts_activity_latest.ics` |
+用下列链接在日历应用中**订阅**（推荐用 `*_latest.ics`）：
 
-- 使用 **`*_latest.ics`** 的链接即可长期订阅，每年内容会自动变为当年数据，无需改链接。
-- 需要某年完整历史时，可在 [Releases](https://github.com/OWNER/REPO/releases) 页面下载对应 `prts_*_YYYY.ics` 文件后本地导入。
+| 日历 | 订阅链接（当年） |
+|------|------------------|
+| 限时寻访 | `https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_limited_recruit_latest.ics` |
+| 常驻标准寻访 | `https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_standard_latest.ics` |
+| 常驻中坚寻访与甄选 | `https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_mid_recruit_latest.ics` |
+| 活动一览 | `https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_activity_latest.ics` |
+
+- 需要某年或全量时，在 [Releases](https://github.com/yuantao313/prts_calendar/releases) 的 **每年归档** 或 **当年+全量** 中下载对应文件。
 
 ## 本地运行
 
 ```bash
 pip install -r requirements.txt
-python prts_calendar.py          # 输出到 output/
-python prts_calendar.py ./my_dir # 输出到指定目录
+python prts_calendar.py                    # 默认 --mode all，输出到 output/
+python prts_calendar.py --mode yearly      # 仅每年归档
+python prts_calendar.py --mode current     # 仅当年 + _latest
+python prts_calendar.py --mode full        # 仅全量 *_all.ics
+python prts_calendar.py ./my_dir --mode all
 ```
+
+**构建模式**：`yearly` = 每年归档，`current` = 仅当年+latest，`full` = 仅全量，`all` = 三者都生成（默认）。
 
 ## 自动更新
 
-仓库内 GitHub Actions 会按计划运行，将生成的 ICS 提交到仓库并上传到 Release（tag: `latest`），订阅上述链接即可自动获得更新。
+GitHub Actions 定时运行，将 ICS 提交到仓库并上传到上述两个 Release，订阅链接会自动更新。
 
 ## 数据来源
 

@@ -26,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Generate ICS files
-        run: python prts_calendar.py
+      - name: Generate ICS files (每年 + 当年 + 全量)
+        run: python prts_calendar.py --mode all
 
       - name: Commit and push if changed
         run: |
@@ -36,7 +36,35 @@ jobs:
           git add output/
           git diff --staged --quiet || (git commit -m "chore: update calendar ICS [skip ci]" && git push)
 
-      - name: Delete old release assets
+      - name: Split output for two releases
+        run: |
+          mkdir -p output_archive output_latest
+          for y in 2019 2020 2021 2022 2023 2024 2025 2026; do
+            cp output/*_$y.ics output_archive/ 2>/dev/null || true
+          done
+          cp output/*_latest.ics output/*_all.ics output_latest/ 2>/dev/null || true
+
+      - name: Release「每年归档」- 删除旧资源并上传
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view archive &>/dev/null; then
+            for name in $(gh release view archive --json assets -q '.assets[].name'); do
+              gh release delete-asset archive "$name" --yes
+            done
+          fi
+
+      - name: Release「每年归档」- 上传按年 ICS
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: archive
+          name: 每年归档
+          body: "按年份归档的卡池与活动 ICS，可按年下载。"
+          files: output_archive/*.ics
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release「当年+全量」- 删除旧资源并上传
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -46,12 +74,12 @@ jobs:
             done
           fi
 
-      - name: Upload ICS to Release (tag latest)
+      - name: Release「当年+全量」- 上传 latest 与 all
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: Calendar ICS (latest)
-          body: "自动生成的 PRTS 卡池与活动日历（ICS），可订阅或导入日历应用。"
-          files: output/*.ics
+          name: 当年 + 全量
+          body: "当年订阅用 *_latest.ics，全量 *_all.ics，可导入或订阅。"
+          files: output_latest/*.ics
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

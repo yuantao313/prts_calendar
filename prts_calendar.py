@@ -340,10 +340,10 @@ def generate_ics_by_year(
     output_dir: str = ".",
     output_prefix: str = "prts_calendar",
     calendar_name_base: str = "明日方舟 卡池",
+    only_current_year: bool = False,
 ) -> dict[int, int]:
     """
-    按年份输出 ICS：每年一个文件，跨年事件同时写入起止年份。
-    传入 html 则按 source 解析；传入 events 则直接使用。
+    按年份输出 ICS。only_current_year 为 True 时只写当年 + _latest。
     返回 { 年份: 该文件内事件数 }。
     """
     if events is None:
@@ -353,7 +353,10 @@ def generate_ics_by_year(
     by_year = events_by_year(events)
     written = {}
     current_year = datetime.now().year
-    for year in sorted(by_year.keys()):
+    years_to_write = [current_year] if only_current_year else sorted(by_year.keys())
+    for year in years_to_write:
+        if year not in by_year:
+            continue
         year_events = by_year[year]
         name = f"{calendar_name_base} {year}"
         ics_bytes = build_ics(year_events, calendar_name=name)
@@ -361,7 +364,6 @@ def generate_ics_by_year(
         with open(path, "wb") as f:
             f.write(ics_bytes)
         written[year] = len(year_events)
-        # 当年数据额外写一份 latest，便于订阅「仅今年」
         if year == current_year:
             path_latest = os.path.join(output_dir, f"{output_prefix}_latest.ics")
             with open(path_latest, "wb") as f:
@@ -369,13 +371,48 @@ def generate_ics_by_year(
     return written
 
 
+def generate_ics_full(
+    events: list[dict],
+    output_dir: str,
+    output_prefix: str,
+    calendar_name_base: str,
+) -> None:
+    """全量：将全部事件写入一个 *_all.ics。"""
+    name = f"{calendar_name_base} 全量"
+    ics_bytes = build_ics(events, calendar_name=name)
+    path = os.path.join(output_dir, f"{output_prefix}_all.ics")
+    with open(path, "wb") as f:
+        f.write(ics_bytes)
+
+
 if __name__ == "__main__":
+    import argparse
     import sys
 
     from sources import POOL_SOURCES, PRTS_API_URL
 
-    output_dir = sys.argv[1] if len(sys.argv) > 1 else "output"
+    parser = argparse.ArgumentParser(description="PRTS 卡池与活动日历 ICS 生成")
+    parser.add_argument(
+        "output_dir",
+        nargs="?",
+        default="output",
+        help="输出目录（默认 output）",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["yearly", "current", "full", "all"],
+        default="all",
+        help="构建模式：yearly=每年归档，current=仅当年+latest，full=仅全量，all=每年+当年+全量（默认）",
+    )
+    args = parser.parse_args()
+    output_dir = args.output_dir
+    mode = args.mode
     os.makedirs(output_dir, exist_ok=True)
+
+    build_yearly = mode in ("yearly", "all")
+    build_current = mode in ("current", "all")
+    build_full = mode in ("full", "all")
+    only_current_year = mode == "current"
 
     try:
         for source in POOL_SOURCES:
@@ -397,7 +434,6 @@ if __name__ == "__main__":
                         all_events.extend(parse_events_from_html(html, source=source))
                     except ValueError as e:
                         print(f"  → {title_with_year} 获取失败: {e}")
-                # 按 (title, start) 去重
                 seen = set()
                 events = []
                 for ev in all_events:
@@ -407,15 +443,8 @@ if __name__ == "__main__":
                         events.append(ev)
                 by_year = events_by_year(events)
                 if not by_year:
-                    skip_msg = "未解析到目标表格（开启时间+寻访页面），跳过输出。"
-                    print(f"  → {skip_msg}")
+                    print(f"  → 未解析到目标表格（开启时间+寻访页面），跳过。")
                     continue
-                counts = generate_ics_by_year(
-                    events=events,
-                    output_dir=output_dir,
-                    output_prefix=sid,
-                    calendar_name_base=name,
-                )
             else:
                 print(f"正在通过 API 获取 [{name}] …")
                 html = fetch_page_via_api(api_url, page_title, mobileformat=mobileformat)
@@ -427,19 +456,24 @@ if __name__ == "__main__":
                         skip_msg += "（活动开始时间+活动页面）"
                     else:
                         skip_msg += "（开启时间+寻访页面）"
-                    print(f"  → {skip_msg}，跳过输出。")
+                    print(f"  → {skip_msg}，跳过。")
                     continue
+
+            if build_yearly or build_current:
                 counts = generate_ics_by_year(
-                    html=html,
-                    source=source,
+                    events=events,
                     output_dir=output_dir,
                     output_prefix=sid,
                     calendar_name_base=name,
+                    only_current_year=only_current_year,
                 )
-            total = sum(counts.values())
-            print(f"  → 已写入 {len(counts)} 个文件，共 {total} 条事件（跨年已重复计入）。")
-            for year in sorted(counts.keys()):
-                print(f"     {sid}_{year}.ics  — {counts[year]} 条")
+                total = sum(counts.values())
+                print(f"  → 已写入 {len(counts)} 个年份文件，共 {total} 条事件。")
+                for year in sorted(counts.keys()):
+                    print(f"     {sid}_{year}.ics  — {counts[year]} 条")
+            if build_full:
+                generate_ics_full(events, output_dir, sid, name)
+                print(f"  → 已写入 {sid}_all.ics（全量）")
         print("全部完成。")
     except requests.RequestException as e:
         print(f"请求失败: {e}")
