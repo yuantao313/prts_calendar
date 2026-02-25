@@ -1,4 +1,4 @@
-# 定时拉取 PRTS 维基数据并生成 ICS 日历，提交回仓库并上传至 Release
+# 定时拉取 PRTS 维基数据，生成 ICS 并仅上传至 Release（不向 main 推送任何文件）
 name: Update calendar
 
 on:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write  # 仅用于创建/更新 Release，不推送代码
 
 jobs:
   update:
@@ -15,8 +15,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -28,13 +26,6 @@ jobs:
 
       - name: Generate ICS files (每年 + 当年 + 全量)
         run: python prts_calendar.py --mode all
-
-      - name: Commit and push if changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add output/
-          git diff --staged --quiet || (git commit -m "chore: update calendar ICS [skip ci]" && git push)
 
       - name: Split output for two releases
         run: |
