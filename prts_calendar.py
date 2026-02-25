@@ -227,7 +227,7 @@ def _parse_activity_table(html: str) -> list[dict]:
 
 
 def _parse_pool_table(html: str) -> list[dict]:
-    """解析卡池表：寻访页面、开启时间、6★/5★ 等。"""
+    """解析卡池表：寻访页面、开启时间、6★/5★ 等。列索引按表头「6星」「5星」识别。"""
     soup = BeautifulSoup(html, "html.parser")
     tables = soup.find_all("table", class_=re.compile(r"wikitable"))
     events = []
@@ -242,13 +242,17 @@ def _parse_pool_table(html: str) -> list[dict]:
         if "开启时间" not in header_text or "寻访页面" not in header_text:
             continue
 
-        col_page = col_time = None
+        col_page = col_time = col_6 = col_5 = None
         for i, cell in enumerate(header_cells):
             t = _cell_text(cell)
             if "寻访页面" in t:
                 col_page = i
             if "开启时间" in t:
                 col_time = i
+            if "6" in t and ("星" in t or "★" in t):
+                col_6 = i
+            if "5" in t and ("星" in t or "★" in t):
+                col_5 = i
         if col_page is None or col_time is None:
             continue
 
@@ -263,24 +267,22 @@ def _parse_pool_table(html: str) -> list[dict]:
             start, end = _parse_time_range(_cell_text(time_cell))
             if start is None or end is None:
                 continue
-            desc_parts = []
-            if len(cells) > 2:
-                six_star = _operator_names_from_cell(cells[2])
-                six_notes = _comment_notes_from_cell(cells[2])
-                part = "6★: " + "、".join(six_star) if six_star else ""
-                if six_notes:
-                    part = (part + " " + " ".join(six_notes)) if part else " ".join(six_notes)
-                if part:
-                    desc_parts.append(part)
-            if len(cells) > 3:
-                five_four = _operator_names_from_cell(cells[3])
-                five_notes = _comment_notes_from_cell(cells[3])
-                part = "5★&4★: " + "、".join(five_four) if five_four else ""
-                if five_notes:
-                    part = (part + " " + " ".join(five_notes)) if part else " ".join(five_notes)
-                if part:
-                    desc_parts.append(part)
-            description = " | ".join(desc_parts).strip()
+            desc_parts: list[str] = []
+            if col_6 is not None and len(cells) > col_6:
+                six_star = _operator_names_from_cell(cells[col_6])
+                six_notes = _comment_notes_from_cell(cells[col_6])
+                if six_star:
+                    desc_parts.append("6★: " + "、".join(six_star))
+                for n in six_notes:
+                    desc_parts.append(n)
+            if col_5 is not None and len(cells) > col_5:
+                five_four = _operator_names_from_cell(cells[col_5])
+                five_notes = _comment_notes_from_cell(cells[col_5])
+                if five_four:
+                    desc_parts.append("5★&4★: " + "、".join(five_four))
+                for n in five_notes:
+                    desc_parts.append(n)
+            description = "\n".join(desc_parts).strip()
 
             key = (title, start.isoformat())
             if key in seen:
