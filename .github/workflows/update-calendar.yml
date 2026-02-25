@@ -30,11 +30,19 @@ jobs:
       - name: Split output for two releases
         run: |
           mkdir -p output_archive output_latest
-          for y in 2019 2020 2021 2022 2023 2024 2025 2026; do
-            cp output/*_$y.ics output_archive/ 2>/dev/null || true
+          # 每年归档：仅 *_YYYY.ics（不要 _latest / _all）
+          for f in output/*.ics; do
+            case "$f" in
+              *'_latest.ics'|*'_all.ics') ;;
+              *) cp "$f" output_archive/ ;;
+            esac
           done
-          cp output/*_latest.ics output/*_all.ics output_latest/ 2>/dev/null || true
+          # 当年+全量：仅 _latest 与 _all
+          cp output/*_latest.ics output/*_all.ics output_latest/
+          echo "归档文件数: $(ls output_archive/*.ics 2>/dev/null | wc -l)"
+          echo "latest 文件数: $(ls output_latest/*.ics 2>/dev/null | wc -l)"
 
+      # 先处理每年归档，最后再处理当年+全量，保证「当年+全量」为仓库 Latest
       - name: Release「每年归档」- 删除旧资源并上传
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,6 +60,7 @@ jobs:
           name: 每年归档
           body: "按年份归档的卡池与活动 ICS，可按年下载。"
           files: output_archive/*.ics
+          make_latest: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -65,12 +74,13 @@ jobs:
             done
           fi
 
-      - name: Release「当年+全量」- 上传 latest 与 all
+      - name: Release「当年+全量」- 上传 latest 与 all（设为仓库 Latest）
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: 当年 + 全量
           body: "当年订阅用 *_latest.ics，全量 *_all.ics，可导入或订阅。"
           files: output_latest/*.ics
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
