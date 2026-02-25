@@ -127,22 +127,33 @@ def _parse_single_time(s: str) -> tuple[datetime | None, datetime | None]:
         return None, None
 
 
+def _page_name_from_href(href: str) -> str:
+    """从 /w/ 链接取页面名：路径解码后只取最后一段，不含父路径（如「寻访模拟」）。"""
+    if not href.startswith("/w/"):
+        return ""
+    path = href.split("/w/", 1)[-1].strip("/")
+    if not path:
+        return ""
+    decoded = unquote(path, encoding="utf-8")
+    return decoded.split("/")[-1].strip()
+
+
 def _title_and_url_from_cell(page_cell) -> tuple[str, str]:
-    """从单元格中取标题与 wiki 路径（/w/ 链接，无则标题用单元格文本）。"""
+    """从单元格中取标题与 wiki 路径。优先用链接文本或 title 属性，否则用 href 的页面名（最后一段）。"""
     title, wiki_path = "", ""
     for a in page_cell.find_all("a", href=True):
         href = a.get("href", "")
         if not href.startswith("/w/"):
             continue
         t = _cell_text(a).strip() or a.get("title", "").strip()
-        if not t and href:
-            t = unquote(href.rstrip("/").split("/")[-1], encoding="utf-8")
+        if not t:
+            t = _page_name_from_href(href)
         if len(t) > len(title):
             title, wiki_path = t, href
     if not title:
         title = _cell_text(page_cell)
     if not title and wiki_path:
-        title = unquote(wiki_path.rstrip("/").split("/")[-1], encoding="utf-8")
+        title = _page_name_from_href(wiki_path)
     wiki_url = ("https://prts.wiki" + wiki_path) if wiki_path else ""
     return title.strip(), wiki_url
 
