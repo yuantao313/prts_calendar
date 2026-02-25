@@ -13,10 +13,10 @@ Actions 会生成两个 Release：
 
 | 日历 | 订阅链接（当年） |
 |------|------------------|
-| 限时寻访 | `https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_limited_recruit_latest.ics` |
-| 常驻标准寻访 | `https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_standard_latest.ics` |
-| 常驻中坚寻访与甄选 | `https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_mid_recruit_latest.ics` |
-| 活动一览 | `https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_activity_latest.ics` |
+| 限时寻访 | [https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_limited_recruit_latest.ics](https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_limited_recruit_latest.ics) |
+| 常驻标准寻访 | [https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_standard_latest.ics](https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_standard_latest.ics) |
+| 常驻中坚寻访与甄选 | [https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_mid_recruit_latest.ics](https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_mid_recruit_latest.ics) |
+| 活动一览 | [https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_activity_latest.ics](https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_activity_latest.ics) |
 
 - 需要某年或全量时，在 [Releases](https://github.com/yuantao313/prts_calendar/releases) 的 **每年归档** 或 **当年+全量** 中下载对应文件。
 
