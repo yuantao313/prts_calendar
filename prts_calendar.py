@@ -139,15 +139,15 @@ def _page_name_from_href(href: str) -> str:
 
 
 def _title_and_url_from_cell(page_cell) -> tuple[str, str]:
-    """从单元格中取标题与 wiki 路径。优先用链接文本或 title 属性，否则用 href 的页面名（最后一段）。"""
+    """从单元格中取标题与 wiki 路径。标题统一用 href 的页面名（路径最后一段），保证简洁无父路径。"""
     title, wiki_path = "", ""
     for a in page_cell.find_all("a", href=True):
         href = a.get("href", "")
         if not href.startswith("/w/"):
             continue
-        t = _cell_text(a).strip() or a.get("title", "").strip()
+        t = _page_name_from_href(href)
         if not t:
-            t = _page_name_from_href(href)
+            t = _cell_text(a).strip() or a.get("title", "").strip()
         if len(t) > len(title):
             title, wiki_path = t, href
     if not title:
