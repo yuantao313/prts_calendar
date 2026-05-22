@@ -1,4 +1,4 @@
-# PRTS 日历 — 明日方舟卡池与活动 ICS
+# PRTS 日历 — 明日方舟卡池与活动 ICS（每小时）
 name: PRTS calendar
 
 on:
@@ -52,7 +52,7 @@ jobs:
             --params '{"page_title":"活动一览","api_url":"https://m.prts.wiki/api.php","mobileformat":true,"parse_mode":"activity"}' \
             --output output
 
-      - name: Split output for two releases
+      - name: Split and release
         run: |
           mkdir -p output_archive output_latest
           for f in output/*.ics; do
@@ -62,47 +62,38 @@ jobs:
             esac
           done
           cp output/*_latest.ics output/*_all.ics output_latest/
-          echo "archive: $(ls output_archive/*.ics 2>/dev/null | wc -l) files"
-          echo "latest:  $(ls output_latest/*.ics 2>/dev/null | wc -l) files"
 
-      - name: Release「每年归档」— 删除旧资源
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
+          # --- archive ---
           if gh release view prts-archive &>/dev/null; then
             for name in $(gh release view prts-archive --json assets -q '.assets[].name'); do
               gh release delete-asset prts-archive "$name" --yes
             done
           fi
+          gh release create prts-archive output_archive/*.ics \
+            --title "每年归档 (PRTS)" --notes "按年份归档的 PRTS 卡池与活动 ICS。" \
+            --prerelease --replace 2>/dev/null || \
+          gh release upload prts-archive output_archive/*.ics --clobber
 
-      - name: Release「每年归档」— 上传
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: prts-archive
-          name: 每年归档 (PRTS)
-          body: "按年份归档的 PRTS 卡池与活动 ICS。"
-          files: output_archive/*.ics
-          make_latest: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Release「当年+全量」— 删除旧资源
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
+          # --- latest ---
           if gh release view prts-latest &>/dev/null; then
             for name in $(gh release view prts-latest --json assets -q '.assets[].name'); do
               gh release delete-asset prts-latest "$name" --yes
             done
           fi
-
-      - name: Release「当年+全量」— 上传
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: prts-latest
-          name: 当年 + 全量 (PRTS)
-          body: "PRTS 当年订阅用 *_latest.ics，全量 *_all.ics。"
-          files: output_latest/*.ics
-          make_latest: true
+          gh release create prts-latest output_latest/*.ics \
+            --title "当年 + 全量 (PRTS)" --notes "当年订阅用 *_latest.ics，全量 *_all.ics。" \
+            --latest --replace 2>/dev/null || \
+          gh release upload prts-latest output_latest/*.ics --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Keep alive (push heartbeat to live branch)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin live 2>/dev/null || true
+          git checkout -B live origin/live 2>/dev/null || git checkout --orphan live
+          date > .heartbeat
+          git add .heartbeat
+          git commit -m "heartbeat $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
+          git push origin live --force
