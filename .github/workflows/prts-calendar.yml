@@ -1,0 +1,108 @@
+# PRTS 日历 — 明日方舟卡池与活动 ICS
+name: PRTS calendar
+
+on:
+  push:
+    branches: [main, master]
+  schedule:
+    - cron: "30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Generate PRTS ICS
+        run: |
+          mkdir -p output
+
+          uv run calpipe gen \
+            --type prts_wiki --id prts_limited_recruit --name '明日方舟 限时寻访' \
+            --params '{"page_title":"卡池一览/限时寻访"}' --output output
+
+          uv run calpipe gen \
+            --type prts_wiki --id prts_standard --name '明日方舟 常驻标准寻访' \
+            --params '{"page_title":"卡池一览/常驻标准寻访","append_year":true,"years":[2019,2020,2021,2022,2023,2024,2025,2026],"api_url":"https://m.prts.wiki/api.php","mobileformat":true}' \
+            --output output
+
+          uv run calpipe gen \
+            --type prts_wiki --id prts_mid_recruit --name '明日方舟 常驻中坚寻访与甄选' \
+            --params '{"page_title":"卡池一览/常驻中坚寻访&中坚甄选","append_year":true,"years":[2023,2024,2025,2026],"api_url":"https://m.prts.wiki/api.php","mobileformat":true}' \
+            --output output
+
+          uv run calpipe gen \
+            --type prts_wiki --id prts_activity --name '明日方舟 活动一览' \
+            --params '{"page_title":"活动一览","api_url":"https://m.prts.wiki/api.php","mobileformat":true,"parse_mode":"activity"}' \
+            --output output
+
+      - name: Split output for two releases
+        run: |
+          mkdir -p output_archive output_latest
+          for f in output/*.ics; do
+            case "$f" in
+              *_latest.ics|*_all.ics) ;;
+              *) cp "$f" output_archive/ ;;
+            esac
+          done
+          cp output/*_latest.ics output/*_all.ics output_latest/
+          echo "archive: $(ls output_archive/*.ics 2>/dev/null | wc -l) files"
+          echo "latest:  $(ls output_latest/*.ics 2>/dev/null | wc -l) files"
+
+      - name: Release「每年归档」— 删除旧资源
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view prts-archive &>/dev/null; then
+            for name in $(gh release view prts-archive --json assets -q '.assets[].name'); do
+              gh release delete-asset prts-archive "$name" --yes
+            done
+          fi
+
+      - name: Release「每年归档」— 上传
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: prts-archive
+          name: 每年归档 (PRTS)
+          body: "按年份归档的 PRTS 卡池与活动 ICS。"
+          files: output_archive/*.ics
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release「当年+全量」— 删除旧资源
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view prts-latest &>/dev/null; then
+            for name in $(gh release view prts-latest --json assets -q '.assets[].name'); do
+              gh release delete-asset prts-latest "$name" --yes
+            done
+          fi
+
+      - name: Release「当年+全量」— 上传
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: prts-latest
+          name: 当年 + 全量 (PRTS)
+          body: "PRTS 当年订阅用 *_latest.ics，全量 *_all.ics。"
+          files: output_latest/*.ics
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

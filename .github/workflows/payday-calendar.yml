@@ -1,0 +1,101 @@
+# 发薪日 + 节假日 + 华为月末周六 ICS 日历
+name: Payday calendar
+
+on:
+  push:
+    branches: [main, master]
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Generate payday ICS
+        run: |
+          mkdir -p output
+
+          uv run calpipe gen \
+            --script examples/chinese_holidays.py --id chinese_holidays --name '中国法定节假日' \
+            --params '{"years":[2025,2026]}' --output output
+
+          uv run calpipe gen \
+            --script examples/company_payday.py --id company_payday --name '公司发薪日' \
+            --params '{"pay_day":15,"strategy":"advance","years":[2025,2026]}' --output output
+
+          uv run calpipe gen \
+            --script examples/huawei_last_saturday.py --id huawei_last_saturday --name '华为月末周六加班' \
+            --params '{"years":[2025,2026]}' --output output
+
+      - name: Split output for two releases
+        run: |
+          mkdir -p output_archive output_latest
+          for f in output/*.ics; do
+            case "$f" in
+              *_latest.ics|*_all.ics) ;;
+              *) cp "$f" output_archive/ ;;
+            esac
+          done
+          cp output/*_latest.ics output/*_all.ics output_latest/
+          echo "archive: $(ls output_archive/*.ics 2>/dev/null | wc -l) files"
+          echo "latest:  $(ls output_latest/*.ics 2>/dev/null | wc -l) files"
+
+      - name: Release「每年归档」— 删除旧资源
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view payday-archive &>/dev/null; then
+            for name in $(gh release view payday-archive --json assets -q '.assets[].name'); do
+              gh release delete-asset payday-archive "$name" --yes
+            done
+          fi
+
+      - name: Release「每年归档」— 上传
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: payday-archive
+          name: 每年归档 (发薪日)
+          body: "按年份归档的发薪日、节假日、月末加班 ICS。"
+          files: output_archive/*.ics
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release「当年+全量」— 删除旧资源
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view payday-latest &>/dev/null; then
+            for name in $(gh release view payday-latest --json assets -q '.assets[].name'); do
+              gh release delete-asset payday-latest "$name" --yes
+            done
+          fi
+
+      - name: Release「当年+全量」— 上传
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: payday-latest
+          name: 当年 + 全量 (发薪日)
+          body: "发薪日、节假日、月末加班当年订阅用 *_latest.ics，全量 *_all.ics。"
+          files: output_latest/*.ics
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

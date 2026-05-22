@@ -1,0 +1,11 @@
+{
+  "output_dir": "output",
+  "sources": [
+    {
+      "type": "prts_wiki",
+      "id": "prts_limited_recruit",
+      "name": "明日方舟 限时寻访",
+      "params": {"page_title": "卡池一览/限时寻访"}
+    }
+  ]
+}
