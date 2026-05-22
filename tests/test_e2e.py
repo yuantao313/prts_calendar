@@ -470,14 +470,13 @@ class TestHuaweiLastSaturday:
     def test_should_work_normal_saturday(self):
         from examples.huawei_last_saturday import HuaweiLastSaturday, _last_saturday
         source = HuaweiLastSaturday("t", "T", {"years": [2025]})
-        # Jan 25 2025 is a regular Saturday, not a holiday, not 调休
-        # Previous 6 days (Jan 24 Fri ... Jan 19 Sun) — Sun is rest
-        # Consecutive from Jan 20 Mon to Jan 25 Sat = 6, < 7 → should work
-        source._cal._holidays = set()  # no holidays
+        source._cal._holidays = set()
         source._cal._tiaoxiu_cache = {}
         source._cal._fetched = True
+        source._cal.is_rest_day = lambda d: d.weekday() >= 5  # only weekends rest
         sat = _last_saturday(2025, 1)
         assert sat == date(2025, 1, 25)
+        # backward: 5 weekdays + 1(Sat) = 6. forward: Sun rest. total 6 < 7.
         assert source._should_work(sat) is True
 
     def test_should_skip_holiday(self):
@@ -497,39 +496,56 @@ class TestHuaweiLastSaturday:
         assert source._should_work(date(2025, 1, 25)) is False
 
     def test_should_skip_7day_rule(self):
+        """All days are workdays → any count triggers >= 7 immediately."""
+        from examples.huawei_last_saturday import HuaweiLastSaturday
+        source = HuaweiLastSaturday("t", "T", {"years": [2025]})
+        source._cal._holidays = set()
+        source._cal._tiaoxiu_cache = {}
+        source._cal._fetched = True
+        source._cal.is_rest_day = lambda d: False
+        assert source._should_work(date(2025, 2, 1)) is False
+
+    def test_should_skip_bidirectional_7day(self):
+        """5 workdays before + 1 after (调休) = 7 consecutive → skip."""
         from examples.huawei_last_saturday import HuaweiLastSaturday
         source = HuaweiLastSaturday("t", "T", {"years": [2025]})
         source._cal._holidays = set()
         source._cal._tiaoxiu_cache = {}
         source._cal._fetched = True
 
-        # Simulate: the 6 days before Sat are all workdays (no rest).
-        # Consecutive = 1(Sat) + 6 = 7 >= 7 → skip
-        sat = date(2025, 2, 1)  # Feb 1 2025 is Saturday
-        original = source._cal.is_rest_day
+        # Sep 27 Sat: 5 back + 1(Sat) + 1 forward(调休) = 7
+        # Simulate: Mon-Fri work, Sat o/t, Sun 调休 work
+        source._cal.is_rest_day = lambda d: (
+            d < date(2025, 9, 22) or (d > date(2025, 9, 28))
+        )
+        assert source._should_work(date(2025, 9, 27)) is False
 
-        def mock_rest(d):
-            return False  # all days are workdays
-        source._cal.is_rest_day = mock_rest
+    def test_sep_2025_guoqing_tiaoxiu_skip(self):
+        """Real scenario: Sep 27 2025 last Sat + Sep 28 调休 = 9 days streak → skip."""
+        from examples.huawei_last_saturday import HuaweiLastSaturday, _last_saturday
+        source = HuaweiLastSaturday("t", "T", {"years": [2025]})
+        source._cal._holidays = set()
+        source._cal._tiaoxiu_cache = {}
+        source._cal._fetched = True
+
+        # Sep 2025: Sep 28(日) is 国庆调休 workday, Oct 1-3 国庆 holiday
+        source._cal._tiaoxiu_cache = {"2025-09-28": True}
+        source._cal._holidays = {"2025-10-01", "2025-10-02", "2025-10-03"}
+        source._cal._fetched = True
+
+        # Rest day: holiday OR (weekend AND NOT 调休)
+        source._cal.is_rest_day = lambda d: (
+            d.strftime("%Y-%m-%d") in {"2025-10-01", "2025-10-02", "2025-10-03"}
+            or (d.weekday() >= 5 and d.strftime("%Y-%m-%d") != "2025-09-28")
+        )
+
+        sat = _last_saturday(2025, 9)
+        assert sat == date(2025, 9, 27)
+        assert source._cal.is_holiday(sat) is False
+        assert source._cal.is_tiaoxiu(sat) is False
+        # Sep 28 调休 → backward: Sep 26-22 (5 workdays). forward: Sep 28-30 (3 workdays).
+        # Total: 1 + 5 + 3 = 9 >= 7 → skip
         assert source._should_work(sat) is False
-        source._cal.is_rest_day = original
-
-    def test_should_work_6day_rule(self):
-        from examples.huawei_last_saturday import HuaweiLastSaturday
-        source = HuaweiLastSaturday("t", "T", {"years": [2025]})
-        source._cal._holidays = set()
-        source._cal._tiaoxiu_cache = {}
-        source._cal._fetched = True
-
-        # Consecutive before Sat = 5, +1(Sat) = 6 < 7 → work
-        sat = date(2025, 2, 1)
-        counter = [0]
-
-        def mock_rest(d):
-            counter[0] += 1
-            return counter[0] > 5  # 6th day before is rest
-        source._cal.is_rest_day = mock_rest
-        assert source._should_work(sat) is True
 
     def test_import_loadable(self):
         cls = load_source_class("examples/huawei_last_saturday.py")

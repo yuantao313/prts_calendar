@@ -112,22 +112,29 @@ class HuaweiLastSaturday(DataSource):
         return events
 
     def _should_work(self, sat: date) -> bool:
-        # Rule 1 & 2: skip holidays and 调休
         if self._cal.is_holiday(sat):
             return False
         if self._cal.is_tiaoxiu(sat):
             return False
 
-        # Rule 3: 7-day consecutive work check
-        # Count backwards from this Saturday, counting consecutive non-rest days
-        consecutive = 1  # this Saturday counts as 1
+        consecutive = 1  # this Saturday
+
         cursor = sat - timedelta(days=1)
-        for _ in range(30):
+        for _ in range(31):
             if self._cal.is_rest_day(cursor):
                 break
             consecutive += 1
             if consecutive >= 7:
                 return False
             cursor -= timedelta(days=1)
+
+        cursor = sat + timedelta(days=1)
+        for _ in range(31):
+            if self._cal.is_rest_day(cursor):
+                break
+            consecutive += 1
+            if consecutive >= 7:
+                return False
+            cursor += timedelta(days=1)
 
         return True
