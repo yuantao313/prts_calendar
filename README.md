@@ -2,23 +2,25 @@
 
 从 [PRTS 维基](https://prts.wiki) 拉取**卡池**与**活动**数据，生成 ICS 日历文件，可导入或订阅到系统日历 / 日历应用。
 
-## 订阅链接（Release）
+## 订阅链接（Jenkins 产物）
 
-Actions 会生成两个 Release：
+Jenkins 定时运行，ICS 作为**构建产物**归档，不再上传 GitHub Release。产物按两个目录组织：
 
-- **当年 + 全量**（tag: `latest`）：`*_latest.ics`（当年订阅用）、`*_all.ics`（全量），适合日常订阅。
-- **每年归档**（tag: `archive`）：`prts_*_2019.ics` … `prts_*_2026.ics`，按年下载。
+- `output_latest/`：`*_latest.ics`（当年订阅用）、`*_all.ics`（全量），适合日常订阅。
+- `output_archive/`：`prts_*_2019.ics` … `prts_*_2026.ics`，按年下载。
 
-用下列链接在日历应用中**订阅**（推荐用 `*_latest.ics`）：
+产物下载地址为 `<JENKINS_URL>/job/<JOB>/lastSuccessfulBuild/artifact/<路径>`（替换为你的 Jenkins 地址与任务名）：
 
-| 日历 | 订阅链接（当年） |
-|------|------------------|
-| 限时寻访 | [prts_limited_recruit_latest.ics](https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_limited_recruit_latest.ics) |
-| 常驻标准寻访 | [prts_standard_latest.ics](https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_standard_latest.ics) |
-| 常驻中坚寻访与甄选 | [prts_mid_recruit_latest.ics](https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_mid_recruit_latest.ics) |
-| 活动一览 | [prts_activity_latest.ics](https://github.com/yuantao313/prts_calendar/releases/download/latest/prts_activity_latest.ics) |
+| 日历 | 产物路径 |
+|------|----------|
+| 限时寻访 | `output_latest/prts_limited_recruit_latest.ics` |
+| 常驻标准寻访 | `output_latest/prts_standard_latest.ics` |
+| 常驻中坚寻访与甄选 | `output_latest/prts_mid_recruit_latest.ics` |
+| 活动一览 | `output_latest/prts_activity_latest.ics` |
 
-- 需要某年或全量时，在 [Releases](https://github.com/yuantao313/prts_calendar/releases) 的 **每年归档** 或 **当年+全量** 中下载对应文件。
+例如：`https://jenkins.example.com/job/prts-calendar/lastSuccessfulBuild/artifact/output_latest/prts_limited_recruit_latest.ics`
+
+- 需要某年或全量时，在 Jenkins 任务页的 **Latest Build → Artifacts** 中下载对应文件。
 
 ## 本地运行
 
@@ -35,7 +37,7 @@ python prts_calendar.py ./my_dir --mode all
 
 ## 自动更新
 
-GitHub Actions 定时运行，将 ICS 提交到仓库并上传到上述两个 Release，订阅链接会自动更新。
+Jenkins 定时运行（每小时第 30 分钟），将 ICS 归档为构建产物，订阅链接会自动更新。
 
 ## 数据来源
 
