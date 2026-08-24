@@ -16,7 +16,6 @@ pipeline {
     environment {
         GH_TOKEN = credentials('github-pat')   // gh CLI 上传 Release 用
         REPO     = 'yuantao313/prts_calendar'
-        GIT_URL  = 'https://github.com/yuantao313/prts_calendar.git'
     }
 
     stages {
@@ -89,25 +88,6 @@ pipeline {
             }
         }
 
-        stage('Keep alive') {
-            steps {
-                sh '''
-                    set -e
-                    # 记录当前分支，结束后恢复，避免污染下次构建的工作区
-                    ORIG_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-                    git config user.name "jenkins[bot]"
-                    git config user.email "jenkins[bot]@users.noreply.github.com"
-                    git checkout --orphan live-heartbeat
-                    git rm -rf . >/dev/null 2>&1 || true
-                    date > .heartbeat
-                    git add .heartbeat
-                    git commit -m "heartbeat $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-                    git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" live-heartbeat:live --force
-                    git checkout -f "$ORIG_BRANCH"
-                    git clean -fdx
-                '''
-            }
-        }
     }
 
     post {
